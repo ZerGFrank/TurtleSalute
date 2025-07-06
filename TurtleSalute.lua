@@ -46,9 +46,22 @@ if not HAVE_MSG then
     return m:sub(1, strlen(MARKER .. PREFIX .. ":")) == MARKER .. PREFIX .. ":"
   end)
 end
+
+-- Debugging output for communication
+local function debugPrint(...)
+    if TurtleSaluteDB.debug then
+        print("[TurtleSalute Debug]", ...)
+    end
+end
+
+-- Updated sendComm function with debugging
 local function sendComm(p)
-  if HAVE_MSG then SendAddonMessage(PREFIX, p, "GUILD")
-  else SendChatMessage(MARKER .. PREFIX .. ":" .. p, "GUILD") end
+    debugPrint("Sending message:", p)
+    if HAVE_MSG then
+        SendAddonMessage(PREFIX, p, "GUILD")
+    else
+        SendChatMessage(MARKER .. PREFIX .. ":" .. p, "GUILD")
+    end
 end
 
 -- State
@@ -88,9 +101,14 @@ local function enqueueRoll(tag)
   if not rollOpen then rollOpen = true; After(TurtleSaluteDB.rollTimeout, finishRoll) end
 end
 
+-- Updated receiveRoll function with debugging
 local function receiveRoll(sender, tag, val)
-  pending[sender] = { roll = tonumber(val), tag = tag }
-  if not rollOpen then rollOpen = true; After(TurtleSaluteDB.rollTimeout, finishRoll) end
+    debugPrint("Received roll from:", sender, "Tag:", tag, "Value:", val)
+    pending[sender] = { roll = tonumber(val), tag = tag }
+    if not rollOpen then
+        rollOpen = true
+        After(TurtleSaluteDB.rollTimeout, finishRoll)
+    end
 end
 
 -- Event frame
@@ -99,39 +117,73 @@ f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("CHAT_MSG_SYSTEM")
 if HAVE_MSG then f:RegisterEvent("CHAT_MSG_ADDON") else f:RegisterEvent("CHAT_MSG_GUILD") end
 
+-- Debugging output for event handling
 f:SetScript("OnEvent", function()
-  local ev = arg1
-  if ev == "PLAYER_LOGIN" then math.randomseed(time()); return end
+    local ev = arg1
+    debugPrint("Event triggered:", ev)
 
-  if ev == "CHAT_MSG_ADDON" then
-    local pre, msg, chan, sender = arg2, arg3, arg4, arg5
-    if pre == PREFIX and chan == "GUILD" then
-      local _,_,tg,val = string.find(msg, "^ROLL:([A-Z]+):(%d+)$")
-      if tg then receiveRoll(sender, tg, val) end
+    if ev == "PLAYER_LOGIN" then
+        math.randomseed(time())
+        debugPrint("Addon initialized.")
+        return
     end
-    return
-  end
 
-  if ev == "CHAT_MSG_GUILD" and not HAVE_MSG then
-    local raw, sender = arg2, arg3
-    local head = MARKER .. PREFIX .. ":"
-    if string.sub(raw,1,strlen(head)) == head then
-      local body = string.sub(raw, strlen(head)+1)
-      local _,_,tg,val = string.find(body, "^ROLL:([A-Z]+):(%d+)$")
-      if tg then receiveRoll(sender, tg, val) end
+    if ev == "CHAT_MSG_ADDON" then
+        local pre, msg, chan, sender = arg2, arg3, arg4, arg5
+        debugPrint("Addon message received:", msg, "From:", sender)
+        if pre == PREFIX and chan == "GUILD" then
+            local _, _, tg, val = string.find(msg, "^ROLL:([A-Z]+):(%d+)$")
+            if tg then receiveRoll(sender, tg, val) end
+        end
+        return
     end
-    return
-  end
 
-  if ev ~= "CHAT_MSG_SYSTEM" then return end
-  local msg = arg2
-  local who = string.match(msg, "^(.-) has joined the guild")
-  if who then lastJoin = who; enqueueRoll(EVT_WELCOME); return end
-  who = string.match(msg, "^(.-) has left the guild")
-  if who then wasKick = false; lastLeave = who; enqueueRoll(EVT_FAREWELL); return end
-  who = string.match(msg, "^(.-) has been kicked")
-  if who then wasKick = true; lastLeave = who; enqueueRoll(EVT_FAREWELL); return end
-  if string.find(msg, "has fallen in Hardcore") then DoEmote("salute") end
+    if ev == "CHAT_MSG_GUILD" and not HAVE_MSG then
+        local raw, sender = arg2, arg3
+        debugPrint("Guild chat message received:", raw, "From:", sender)
+        local head = MARKER .. PREFIX .. ":"
+        if string.sub(raw, 1, strlen(head)) == head then
+            local body = string.sub(raw, strlen(head) + 1)
+            local _, _, tg, val = string.find(body, "^ROLL:([A-Z]+):(%d+)$")
+            if tg then receiveRoll(sender, tg, val) end
+        end
+        return
+    end
+
+    if ev ~= "CHAT_MSG_SYSTEM" then return end
+    local msg = arg2
+    debugPrint("System message received:", msg)
+
+    local who = string.match(msg, "^(.-) has joined the guild")
+    if who then
+        debugPrint("Player joined:", who)
+        lastJoin = who
+        enqueueRoll(EVT_WELCOME)
+        return
+    end
+
+    who = string.match(msg, "^(.-) has left the guild")
+    if who then
+        debugPrint("Player left:", who)
+        wasKick = false
+        lastLeave = who
+        enqueueRoll(EVT_FAREWELL)
+        return
+    end
+
+    who = string.match(msg, "^(.-) has been kicked")
+    if who then
+        debugPrint("Player kicked:", who)
+        wasKick = true
+        lastLeave = who
+        enqueueRoll(EVT_FAREWELL)
+        return
+    end
+
+    if string.find(msg, "has fallen in Hardcore") then
+        debugPrint("Hardcore death detected.")
+        DoEmote("salute")
+    end
 end)
 
 -- Slash command
@@ -144,4 +196,12 @@ SlashCmdList["TS"] = function(c)
   else
     print("/ts timeout <sec> (current " .. TurtleSaluteDB.rollTimeout .. ")")
   end
+end
+
+-- Slash command to toggle debugging
+SLASH_TSDEBUG1 = "/tsdebug"
+SlashCmdList["TSDEBUG"] = function()
+    TurtleSaluteDB.debug = not TurtleSaluteDB.debug
+    local status = TurtleSaluteDB.debug and "enabled" or "disabled"
+    print("TurtleSalute debugging is now", status)
 end
