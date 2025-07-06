@@ -1,122 +1,147 @@
--- TurtleSalute.lua  •  auto-welcomes, snarks, and salutes
-local playerName = UnitName("player")
+-- TurtleSalute - guild greet/farewell with roll-based spam control
 
--- System chat patterns (enUS client strings)
-local JOIN  = "(.+) has joined the guild"
-local LEAVE = "(.+) has left the guild"
-local KICK  = "(.+) has been kicked out of the guild"
-
--- Return current guild name (fallback so the code never nils)
-local function G() return GetGuildInfo("player") or "our guild" end
-
--- Quote pools
-local welcomeLines = {
-    "Welcome to GUILD, NAME! Don’t forget your complimentary shell polish.",
-    "Slow and steady wins raids—glad you joined GUILD, NAME!",
-    "NAME just hopped aboard GUILD’s party wagon. Buckle up!",
-    "Fresh meat! Err… fresh kelp? Either way, welcome to GUILD, NAME.",
-    "Shell yeah! NAME is now part of GUILD.",
-    "NAME just joined GUILD! Time to teach them the turtle shuffle.",
-    "Welcome aboard, NAME! Hope you brought snacks for the raid.",
-    "NAME has entered GUILD. Let the shell-abration begin!",
-    "Slow and steady, NAME! Welcome to GUILD, where patience is a virtue.",
-    "NAME joined GUILD! Prepare for epic turtle power!",
-    "Welcome, NAME! GUILD’s shell game just got stronger.",
-    "NAME is now part of GUILD! Let’s shell-ebrate with a dance-off.",
-    "NAME joined GUILD! Hope you like long walks on the beach.",
-    "Welcome, NAME! GUILD’s shell polish is on the house.",
-    "NAME just joined GUILD! Time to turtle up and raid!",
-    "A TURTLE MADE IT TO THE WATER! Welcome to GUILD, NAME!",
+-- Saved variables (defaults)
+TurtleSaluteDB = TurtleSaluteDB or {}
+local defaults = {
+  winnersPerEvent = { WELCOME = 5, FAREWELL = 3 },
+  rollTimeout     = 1.0,   -- seconds to collect rolls
 }
+for k, v in pairs(defaults) do if TurtleSaluteDB[k] == nil then TurtleSaluteDB[k] = v end end
 
-local leaveLines = {
-    "NAME left GUILD. Guess the turtle pace was too OP.",
-    "Farewell, NAME—may your walk speed be ever swift outside GUILD.",
-    "NAME rage‑quit GUILD faster than /camp.",
-    "Another shell rolls away… bye, NAME!",
-    "NAME couldn’t handle GUILD’s cool‑down… see ya!",
-    "NAME left GUILD. Guess they couldn’t handle the turtle grind.",
-    "NAME has left GUILD. May their shell always be shiny.",
-    "NAME rage-quit GUILD faster than a turtle on turbo.",
-    "NAME left GUILD. The turtle tide rolls on without them.",
-    "NAME couldn’t keep up with GUILD’s turtle tactics. Farewell!",
-    "NAME left GUILD. Guess they prefer hare-speed adventures.",
-    "NAME has left GUILD. May their next guild be less shell-shocking.",
-    "NAME rolled out of GUILD. The turtle shuffle continues!",
-    "NAME left GUILD. Hope they find a faster shell elsewhere.",
-    "NAME couldn’t handle GUILD’s turtle pace. Bye-bye!",
-    "NAME was an NPC anyway. They left GUILD to become a quest giver.",
-}
-
-local kickLines = {
-    "GUILD just yeeted NAME into the great beyond. 🐢💨",
-    "NAME was booted from GUILD. Mind the doorstep on the way out!",
-    "Ouch—NAME just bounced off GUILD’s shell.",
-    "GUILD applied /gkick to NAME. It was super‑effective!",
-    "NAME has been kicked: shell shock is real.",
-    "GUILD just gave NAME the boot. Shell shock incoming!",
-    "NAME was kicked from GUILD. Guess they weren’t turtle enough.",
-    "GUILD applied /gkick to NAME. The shell storm is real!",
-    "NAME got yeeted from GUILD. Watch out for flying turtles!",
-    "NAME was booted from GUILD. The shell shuffle stops here.",
-    "GUILD kicked NAME out. Guess they didn’t pass the turtle test.",
-    "NAME was kicked from GUILD. The shell-polish budget is safe again!",
-    "GUILD just bounced NAME out. Turtle power prevails!",
-    "NAME got kicked from GUILD. The turtle tide rolls on!",
-    "NAME was kicked from GUILD. Shell shock therapy recommended."
-}
-
--- Helpers ---------------------------------------------------------------
-local function pick(list)
-    return list[math.random(1, table.getn(list))]  -- Lua 5.0: table.getn()
+-- Helpers
+local strlen = string.len
+local function tbl_len(t) return table.getn(t) end            -- vanilla len
+if not wipe then function wipe(t) for k in pairs(t) do t[k] = nil end end end
+local function smatch(s, p) if not s then return end return string.find(s, p) end
+local function After(d, fn)
+  if C_Timer and C_Timer.After then return C_Timer.After(d, fn) end
+  local fr, acc = CreateFrame("Frame"), 0
+  fr:SetScript("OnUpdate", function(self, dt)
+    acc = acc + dt; if acc >= d then self:SetScript("OnUpdate", nil); fn() end
+  end)
 end
 
+-- Load quote tables from optional file
+local Welcome, Leave, Kick = { "Welcome, {player}!" }, { "Farewell, {player}." }, { "{player} was kicked!" }
+local ok, data = pcall(require, "TurtleSaluteLines")
+if ok and type(data) == "table" and data[1] then Welcome, Leave, Kick = data[1], data[2], data[3] end
+
+-- Simple format
+local function gname() return GetGuildInfo("player") or "the guild" end
 local function fmt(tmpl, who)
-    tmpl = string.gsub(tmpl, "NAME", who)
-    return string.gsub(tmpl, "GUILD", G())
+  tmpl = string.gsub(tmpl, "{player}", who)
+  return string.gsub(tmpl, "{guild}", gname())
+end
+local function pick(t) return t[math.random(1, tbl_len(t))] end
+
+-- Constants
+local PREFIX, MARKER = "TSALUTE", "§"
+local EVT_WELCOME, EVT_FAREWELL = "WELCOME", "FAREWELL"
+
+-- Communication hide if SendAddonMessage missing
+local HAVE_MSG = type(SendAddonMessage) == "function"
+if not ChatFrame_AddMessageEventFilter then ChatFrame_AddMessageEventFilter = function() end end
+if not HAVE_MSG then
+  ChatFrame_AddMessageEventFilter("CHAT_MSG_GUILD", function(_, _, m)
+    return m:sub(1, strlen(MARKER .. PREFIX .. ":")) == MARKER .. PREFIX .. ":"
+  end)
+end
+local function sendComm(p)
+  if HAVE_MSG then SendAddonMessage(PREFIX, p, "GUILD")
+  else SendChatMessage(MARKER .. PREFIX .. ":" .. p, "GUILD") end
 end
 
-local function welcome(name)
-    if name ~= playerName then
-        SendChatMessage(fmt(pick(welcomeLines), name), "GUILD")
+-- State
+local pending, rollOpen = {}, false
+local lastJoin, lastLeave, wasKick = nil, nil, false
+
+-- Roll finalise
+local function finishRoll()
+  rollOpen = false; if next(pending) == nil then return end
+  local buckets = {}
+  for n, d in pairs(pending) do
+    local t = d.tag; if not buckets[t] then buckets[t] = {} end
+    local lst = buckets[t]; lst[tbl_len(lst) + 1] = { n, d.roll }
+  end
+  wipe(pending)
+  for tag, lst in pairs(buckets) do
+    table.sort(lst, function(a, b) return a[2] == b[2] and a[1] < b[1] or a[2] > b[2] end)
+    local cap = TurtleSaluteDB.winnersPerEvent[tag] or 0
+    local winners = {}
+    for i = 1, math.min(cap, tbl_len(lst)) do winners[lst[i][1]] = true end
+    DoEmote("salute")
+    if winners[UnitName("player")] then
+      if tag == EVT_WELCOME and lastJoin then SendChatMessage(fmt(pick(Welcome), lastJoin), "GUILD") end
+      if tag == EVT_FAREWELL and lastLeave then
+        local pool = wasKick and Kick or Leave
+        SendChatMessage(fmt(pick(pool), lastLeave), "GUILD")
+      end
     end
+  end
 end
 
-local function salute(name, kicked)
-    if name ~= playerName then
-        local pool = kicked and kickLines or leaveLines
-        SendChatMessage(fmt(pick(pool), name), "GUILD")
-        DoEmote("SALUTE")
-    end
+local function enqueueRoll(tag)
+  local me = UnitName("player")
+  local r  = math.random(1, 1000)
+  pending[me] = { roll = r, tag = tag }
+  sendComm("ROLL:" .. tag .. ":" .. r)
+  if not rollOpen then rollOpen = true; After(TurtleSaluteDB.rollTimeout, finishRoll) end
 end
 
--- Event driver ----------------------------------------------------------
+local function receiveRoll(sender, tag, val)
+  pending[sender] = { roll = tonumber(val), tag = tag }
+  if not rollOpen then rollOpen = true; After(TurtleSaluteDB.rollTimeout, finishRoll) end
+end
+
+-- Event frame
 local f = CreateFrame("Frame")
+f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("CHAT_MSG_SYSTEM")
-math.randomseed(time())
+if HAVE_MSG then f:RegisterEvent("CHAT_MSG_ADDON") else f:RegisterEvent("CHAT_MSG_GUILD") end
 
 f:SetScript("OnEvent", function()
-    if event ~= "CHAT_MSG_SYSTEM" then return end   -- ignore anything else
-    local msg = arg1                                 -- system text
+  local ev = arg1
+  if ev == "PLAYER_LOGIN" then math.randomseed(time()); return end
 
-    -- joined
-    local _, _, who = string.find(msg, JOIN)
-    if who then
-        welcome(who)
-        return
+  if ev == "CHAT_MSG_ADDON" then
+    local pre, msg, chan, sender = arg2, arg3, arg4, arg5
+    if pre == PREFIX and chan == "GUILD" then
+      local _,_,tg,val = string.find(msg, "^ROLL:([A-Z]+):(%d+)$")
+      if tg then receiveRoll(sender, tg, val) end
     end
+    return
+  end
 
-    -- left
-    _, _, who = string.find(msg, LEAVE)
-    if who then
-        salute(who, false)
-        return
+  if ev == "CHAT_MSG_GUILD" and not HAVE_MSG then
+    local raw, sender = arg2, arg3
+    local head = MARKER .. PREFIX .. ":"
+    if string.sub(raw,1,strlen(head)) == head then
+      local body = string.sub(raw, strlen(head)+1)
+      local _,_,tg,val = string.find(body, "^ROLL:([A-Z]+):(%d+)$")
+      if tg then receiveRoll(sender, tg, val) end
     end
+    return
+  end
 
-    -- kicked
-    _, _, who = string.find(msg, KICK)
-    if who then
-        salute(who, true)
-        return
-    end
+  if ev ~= "CHAT_MSG_SYSTEM" then return end
+  local msg = arg2
+  local who = string.match(msg, "^(.-) has joined the guild")
+  if who then lastJoin = who; enqueueRoll(EVT_WELCOME); return end
+  who = string.match(msg, "^(.-) has left the guild")
+  if who then wasKick = false; lastLeave = who; enqueueRoll(EVT_FAREWELL); return end
+  who = string.match(msg, "^(.-) has been kicked")
+  if who then wasKick = true; lastLeave = who; enqueueRoll(EVT_FAREWELL); return end
+  if string.find(msg, "has fallen in Hardcore") then DoEmote("salute") end
 end)
+
+-- Slash command
+SLASH_TS1 = "/ts"
+SlashCmdList["TS"] = function(c)
+  local a, b = c:match("^(%S*)%s*(.-)$")
+  if a == "timeout" then
+    local t = tonumber(b)
+    if t then TurtleSaluteDB.rollTimeout = t; print("TS timeout set to", t) else print("usage: /ts timeout <sec>") end
+  else
+    print("/ts timeout <sec> (current " .. TurtleSaluteDB.rollTimeout .. ")")
+  end
+end
