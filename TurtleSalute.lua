@@ -15,7 +15,18 @@ local welcomeLines = {
     "Slow and steady wins raids—glad you joined GUILD, NAME!",
     "NAME just hopped aboard GUILD’s party wagon. Buckle up!",
     "Fresh meat! Err… fresh kelp? Either way, welcome to GUILD, NAME.",
-    "Shell yeah! NAME is now part of GUILD."
+    "Shell yeah! NAME is now part of GUILD.",
+    "NAME just joined GUILD! Time to teach them the turtle shuffle.",
+    "Welcome aboard, NAME! Hope you brought snacks for the raid.",
+    "NAME has entered GUILD. Let the shell-abration begin!",
+    "Slow and steady, NAME! Welcome to GUILD, where patience is a virtue.",
+    "NAME joined GUILD! Prepare for epic turtle power!",
+    "Welcome, NAME! GUILD’s shell game just got stronger.",
+    "NAME is now part of GUILD! Let’s shell-ebrate with a dance-off.",
+    "NAME joined GUILD! Hope you like long walks on the beach.",
+    "Welcome, NAME! GUILD’s shell polish is on the house.",
+    "NAME just joined GUILD! Time to turtle up and raid!",
+    "A TURTLE MADE IT TO THE WATER! Welcome to GUILD, NAME!",
 }
 
 local leaveLines = {
@@ -23,7 +34,18 @@ local leaveLines = {
     "Farewell, NAME—may your walk speed be ever swift outside GUILD.",
     "NAME rage‑quit GUILD faster than /camp.",
     "Another shell rolls away… bye, NAME!",
-    "NAME couldn’t handle GUILD’s cool‑down… see ya!"
+    "NAME couldn’t handle GUILD’s cool‑down… see ya!",
+    "NAME left GUILD. Guess they couldn’t handle the turtle grind.",
+    "NAME has left GUILD. May their shell always be shiny.",
+    "NAME rage-quit GUILD faster than a turtle on turbo.",
+    "NAME left GUILD. The turtle tide rolls on without them.",
+    "NAME couldn’t keep up with GUILD’s turtle tactics. Farewell!",
+    "NAME left GUILD. Guess they prefer hare-speed adventures.",
+    "NAME has left GUILD. May their next guild be less shell-shocking.",
+    "NAME rolled out of GUILD. The turtle shuffle continues!",
+    "NAME left GUILD. Hope they find a faster shell elsewhere.",
+    "NAME couldn’t handle GUILD’s turtle pace. Bye-bye!",
+    "NAME was an NPC anyway. They left GUILD to become a quest giver.",
 }
 
 local kickLines = {
@@ -31,7 +53,17 @@ local kickLines = {
     "NAME was booted from GUILD. Mind the doorstep on the way out!",
     "Ouch—NAME just bounced off GUILD’s shell.",
     "GUILD applied /gkick to NAME. It was super‑effective!",
-    "NAME has been kicked: shell shock is real."
+    "NAME has been kicked: shell shock is real.",
+    "GUILD just gave NAME the boot. Shell shock incoming!",
+    "NAME was kicked from GUILD. Guess they weren’t turtle enough.",
+    "GUILD applied /gkick to NAME. The shell storm is real!",
+    "NAME got yeeted from GUILD. Watch out for flying turtles!",
+    "NAME was booted from GUILD. The shell shuffle stops here.",
+    "GUILD kicked NAME out. Guess they didn’t pass the turtle test.",
+    "NAME was kicked from GUILD. The shell-polish budget is safe again!",
+    "GUILD just bounced NAME out. Turtle power prevails!",
+    "NAME got kicked from GUILD. The turtle tide rolls on!",
+    "NAME was kicked from GUILD. Shell shock therapy recommended."
 }
 
 -- Helpers ---------------------------------------------------------------
