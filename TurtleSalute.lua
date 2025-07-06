@@ -66,6 +66,13 @@ local kickLines = {
     "NAME was kicked from GUILD. Shell shock therapy recommended."
 }
 
+-- Debugging output for communication
+local function debugPrint(...)
+    if TurtleSaluteDB.debug then
+        print("[TurtleSalute Debug]", ...)
+    end
+end
+
 -- Helpers ---------------------------------------------------------------
 local function pick(list)
     return list[math.random(1, table.getn(list))]  -- Lua 5.0: table.getn()
@@ -90,33 +97,105 @@ local function salute(name, kicked)
     end
 end
 
+-- Updated sendComm function with debugging
+local function sendComm(p)
+    debugPrint("Sending message:", p)
+    if HAVE_MSG then
+        SendAddonMessage(PREFIX, p, "GUILD")
+    else
+        SendChatMessage(MARKER .. PREFIX .. ":" .. p, "GUILD")
+    end
+end
+
+-- Updated receiveRoll function with debugging
+local function receiveRoll(sender, tag, val)
+    debugPrint("Received roll from:", sender, "Tag:", tag, "Value:", val)
+    pending[sender] = { roll = tonumber(val), tag = tag }
+    if not rollOpen then
+        rollOpen = true
+        After(TurtleSaluteDB.rollTimeout, finishRoll)
+    end
+end
+
 -- Event driver ----------------------------------------------------------
 local f = CreateFrame("Frame")
 f:RegisterEvent("CHAT_MSG_SYSTEM")
 math.randomseed(time())
 
+-- Debugging output for event handling
 f:SetScript("OnEvent", function()
-    if event ~= "CHAT_MSG_SYSTEM" then return end   -- ignore anything else
-    local msg = arg1                                 -- system text
+    local ev = arg1
+    debugPrint("Event triggered:", ev)
 
-    -- joined
-    local _, _, who = string.find(msg, JOIN)
-    if who then
-        welcome(who)
+    if ev == "PLAYER_LOGIN" then
+        math.randomseed(time())
+        debugPrint("Addon initialized.")
         return
     end
 
-    -- left
-    _, _, who = string.find(msg, LEAVE)
-    if who then
-        salute(who, false)
+    if ev == "CHAT_MSG_ADDON" then
+        local pre, msg, chan, sender = arg2, arg3, arg4, arg5
+        debugPrint("Addon message received:", msg, "From:", sender)
+        if pre == PREFIX and chan == "GUILD" then
+            local _, _, tg, val = string.find(msg, "^ROLL:([A-Z]+):(%d+)$")
+            if tg then receiveRoll(sender, tg, val) end
+        end
         return
     end
 
-    -- kicked
-    _, _, who = string.find(msg, KICK)
-    if who then
-        salute(who, true)
+    if ev == "CHAT_MSG_GUILD" and not HAVE_MSG then
+        local raw, sender = arg2, arg3
+        debugPrint("Guild chat message received:", raw, "From:", sender)
+        local head = MARKER .. PREFIX .. ":"
+        if string.sub(raw, 1, strlen(head)) == head then
+            local body = string.sub(raw, strlen(head) + 1)
+            local _, _, tg, val = string.find(body, "^ROLL:([A-Z]+):(%d+)$")
+            if tg then receiveRoll(sender, tg, val) end
+        end
         return
+    end
+
+    if ev == "CHAT_MSG_SYSTEM" then
+        local msg = arg2
+        debugPrint("System message received:", msg)
+
+        local who = string.match(msg, "^(.-) has joined the guild")
+        if who then
+            debugPrint("Player joined:", who)
+            lastJoin = who
+            enqueueRoll(EVT_WELCOME)
+            return
+        end
+
+        who = string.match(msg, "^(.-) has left the guild")
+        if who then
+            debugPrint("Player left:", who)
+            wasKick = false
+            lastLeave = who
+            enqueueRoll(EVT_FAREWELL)
+            return
+        end
+
+        who = string.match(msg, "^(.-) has been kicked")
+        if who then
+            debugPrint("Player kicked:", who)
+            wasKick = true
+            lastLeave = who
+            enqueueRoll(EVT_FAREWELL)
+            return
+        end
+
+        if string.find(msg, "has fallen in Hardcore") then
+            debugPrint("Hardcore death detected.")
+            DoEmote("salute")
+        end
     end
 end)
+
+-- Slash command to toggle debugging
+SLASH_TSDEBUG1 = "/tsdebug"
+SlashCmdList["TSDEBUG"] = function()
+    TurtleSaluteDB.debug = not TurtleSaluteDB.debug
+    local status = TurtleSaluteDB.debug and "enabled" or "disabled"
+    print("TurtleSalute debugging is now", status)
+end
