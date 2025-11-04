@@ -1,6 +1,6 @@
 ## Interface: 11200
 ## Title: |cff39ff14Turtle|r|cffffffffSalute|r
 ## Author: Geomi, Xcfz
-## Notes: Welcomes newbies & snarks leavers/kick‑ees
-## Version: 1.1
+## Notes: Welcome New Guildies & Salute Leavers
+## Version: 1.2
 TurtleSalute.lua
