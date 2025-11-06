@@ -12,22 +12,21 @@ local function G() return GetGuildInfo("player") or "our guild" end
 
 -- Quote pools (welcomes only — leave/kick lines removed per request)
 local welcomeLines = {
-    "Welcome to GUILD, NAME! Don’t forget your complimentary shell polish.",
-    "Slow and steady wins the raids, NAME. Glad you've joined GUILD!",
-    "NAME just hopped aboard the GUILD party wagon. Buckle up!",
-    "Fresh meat! Err… fresh kelp? Either way, welcome to GUILD NAME.",
-    "Shell yeah! NAME is now part of GUILD.",
-    "NAME just joined GUILD! Time to teach them the turtle shuffle.",
-    "Welcome aboard, NAME! Hope you brought snacks for the raid.",
-    "NAME has entered GUILD. Let the shell-abration begin!",
-    "Slow and steady, NAME! Welcome to GUILD, where patience is a virtue.",
-    "NAME joined GUILD! Prepare for epic turtle adventures!",
-    "Welcome, NAME! GUILD’s shell game just got stronger.",
-    "NAME is now part of GUILD! Let’s shell-ebrate!",
-    "NAME joined GUILD! Hope you like long walks on the beach.",
-    "Welcome, NAME! GUILD’s shell polish is on the house.",
-    "NAME just joined GUILD! Time to turtle up and raid!",
-    "A TURTLE MADE IT TO THE WATER! Welcome to GUILD, NAME!",
+    "Welcome to GUILD, NAME! Try not to break anything in the first five minutes.",
+    "A wild NAME has appeared in GUILD! Someone hand them a quest log.",
+    "NAME has joined GUILD! Hope you brought snacks and questionable life choices.",
+    "Brace yourselves... NAME has arrived in GUILD!",
+    "GUILD just got 10% cooler thanks to NAME.",
+    "NAME has entered GUILD — may their loot rolls be ever in their favor.",
+    "Welcome to GUILD, NAME! Remember, we don’t talk about the last raid night.",
+    "NAME just joined GUILD. Hide your mounts and lock the bank.",
+    "A new challenger approaches! Welcome to GUILD, NAME!",
+    "NAME has joined GUILD! The average IQ of the guild has definitely changed.",
+    "Welcome aboard, NAME! We promise it’s mostly chaos, but fun chaos.",
+    "NAME joined GUILD! Someone hand them the survival guide.",
+    "Big cheers for NAME joining GUILD! Hope you brought a sense of humor.",
+    "NAME has joined GUILD! May your armor never break mid-dungeon.",
+    "Welcome to GUILD, NAME! The initiation ritual is purely optional. Probably.",
 }
 
 -- Helpers ---------------------------------------------------------------
